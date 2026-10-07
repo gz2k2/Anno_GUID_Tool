@@ -39,6 +39,7 @@ from tkinter import filedialog, messagebox, ttk
 
 import customtkinter as ctk
 
+from core.config_manager import in_ranges, parse_ranges
 from core.xml_scanner import apply_dummy_map, collect_guids, rewrite_xml_files
 
 #: Check box glyphs for replacement selection table.
@@ -89,11 +90,23 @@ class ReplaceTab:
         self.lbl_mod_path = ctk.CTkLabel(ctrl_frame, text="", text_color="gray")
         self.lbl_mod_path.grid(row=0, column=1, padx=10, pady=10, sticky="w")
 
-        # Row 1: read-only display of the dummy GUID range (edited in Settings)
+        # Row 1: Dummy GUID range selection (Settings checkbox + custom entry field)
         self.lbl_dummy_range = ctk.CTkLabel(ctrl_frame, text="")
         self.lbl_dummy_range.grid(row=1, column=0, padx=10, pady=5, sticky="e")
-        self.lbl_dummy_range_value = ctk.CTkLabel(ctrl_frame, text="")
-        self.lbl_dummy_range_value.grid(row=1, column=1, padx=10, pady=5, sticky="w")
+
+        dummy_container = ctk.CTkFrame(ctrl_frame, fg_color="transparent")
+        dummy_container.grid(row=1, column=1, columnspan=2, padx=0, pady=5, sticky="w")
+
+        self.var_use_settings_dummy = tk.BooleanVar(value=self.app.settings.use_settings_dummy)
+        self.chk_use_settings_dummy = ctk.CTkCheckBox(
+            dummy_container, text="", variable=self.var_use_settings_dummy,
+            command=self.on_use_settings_dummy_toggled,
+        )
+        self.chk_use_settings_dummy.pack(side="left", padx=(10, 10))
+
+        self.entry_custom_dummy_range = ctk.CTkEntry(dummy_container, width=220)
+        self.entry_custom_dummy_range.pack(side="left", padx=5)
+        self.entry_custom_dummy_range.bind("<KeyRelease>", self._on_custom_dummy_edited)
 
         # Row 2: start GUID entry + own range info
         self.lbl_start = ctk.CTkLabel(ctrl_frame, text="")
@@ -127,9 +140,10 @@ class ReplaceTab:
         )
         self.btn_replace.grid(row=5, column=1, padx=10, pady=15, sticky="w")
 
-        # Apply initial enabled/disabled state of the start GUID field
-        # without writing the config (nothing changed yet).
+        # Apply initial enabled/disabled state of fields without writing config
         self.on_auto_assign_toggled(save=False)
+        self.on_use_settings_dummy_toggled(save=False)
+        self.on_replace_non_own_toggled(save=False)
 
         # --- Selection controls & Treeview for target GUIDs -------------
         table_bar = ctk.CTkFrame(self.parent, fg_color="transparent")
@@ -180,6 +194,7 @@ class ReplaceTab:
         if not self.working_path:
             self.lbl_mod_path.configure(text=tr("no_path_drop" if self.drop_enabled else "no_path"))
         self.lbl_dummy_range.configure(text=tr("lbl_dummy_range"))
+        self.chk_use_settings_dummy.configure(text=tr("chk_use_settings_dummy"))
         self.lbl_start.configure(text=tr("lbl_start_guid"))
         self.chk_automatic.configure(text=tr("chk_automatic"))
         self.chk_replace_non_own.configure(text=tr("chk_replace_non_own"))
@@ -196,7 +211,11 @@ class ReplaceTab:
         """Show the active game's own ranges and dummy ranges (from Settings) in this tab."""
         cfg = self.app.game
         self.lbl_range_info.configure(text=self.app.tr("lbl_range_info").format(cfg.own_ranges_text))
-        self.lbl_dummy_range_value.configure(text=cfg.dummy_ranges_text)
+        if self.var_use_settings_dummy.get():
+            self.entry_custom_dummy_range.configure(state="normal")
+            self.entry_custom_dummy_range.delete(0, tk.END)
+            self.entry_custom_dummy_range.insert(0, cfg.dummy_ranges_text)
+            self.entry_custom_dummy_range.configure(state="disabled", text_color="gray")
 
     # ==================================================================
     # Callbacks from the Settings tab
@@ -270,8 +289,11 @@ class ReplaceTab:
         """Return ``{dummy_guid: {files...}}`` for all target GUIDs in the loaded mod."""
         if self.var_replace_non_own.get():
             predicate = lambda g: g.isdigit() and not self.app.game.is_own_guid(g)
-        else:
+        elif self.var_use_settings_dummy.get():
             predicate = self.app.game.is_dummy_guid
+        else:
+            custom_ranges = parse_ranges(self.entry_custom_dummy_range.get())
+            predicate = lambda g: g.isdigit() and in_ranges(int(g), custom_ranges)
         guid_files, _ = collect_guids(self.working_path, predicate)
         return guid_files
 
@@ -449,6 +471,28 @@ class ReplaceTab:
         self.update_selected_stats()
         return "break"
 
+    def on_use_settings_dummy_toggled(self, save=True):
+        """Enable/disable custom dummy range field based on "Use settings dummy range"."""
+        if save:
+            self.app.settings.use_settings_dummy = bool(self.var_use_settings_dummy.get())
+            self.app.settings.save()
+
+        if self.var_use_settings_dummy.get():
+            self.entry_custom_dummy_range.configure(state="normal")
+            self.entry_custom_dummy_range.delete(0, tk.END)
+            self.entry_custom_dummy_range.insert(0, self.app.game.dummy_ranges_text)
+            self.entry_custom_dummy_range.configure(state="disabled", text_color="gray")
+        else:
+            self.entry_custom_dummy_range.configure(state="normal", text_color=("black", "white"))
+
+        if self.working_path:
+            self.scan_dummies()
+
+    def _on_custom_dummy_edited(self, event=None):
+        """Re-scan loaded mod when custom dummy range entry is edited."""
+        if not self.var_use_settings_dummy.get() and self.working_path:
+            self.scan_dummies()
+
     def on_auto_assign_toggled(self, save=True):
         """Enable/disable the start GUID field depending on "Automatic".
 
@@ -472,6 +516,14 @@ class ReplaceTab:
         if save:
             self.app.settings.replace_non_own = bool(self.var_replace_non_own.get())
             self.app.settings.save()
+
+        if self.var_replace_non_own.get():
+            self.chk_use_settings_dummy.configure(state="disabled")
+            self.entry_custom_dummy_range.configure(state="disabled", text_color="gray")
+        else:
+            self.chk_use_settings_dummy.configure(state="normal")
+            self.on_use_settings_dummy_toggled(save=False)
+
         if self.working_path:
             self.scan_dummies()
 
@@ -518,8 +570,11 @@ class ReplaceTab:
         if not all_found:
             if self.var_replace_non_own.get():
                 messagebox.showinfo("Info", tr("msg_no_non_own_guids").format(cfg.own_ranges_text))
-            else:
+            elif self.var_use_settings_dummy.get():
                 messagebox.showinfo("Info", tr("msg_no_dummies").format(cfg.dummy_ranges_text))
+            else:
+                dummy_text = self.entry_custom_dummy_range.get().strip() or "Custom"
+                messagebox.showinfo("Info", tr("msg_no_dummies").format(dummy_text))
             return
 
         dummy_files = {g: files for g, files in all_found.items() if g in self.selected_dummies}

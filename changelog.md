@@ -1,5 +1,15 @@
 # Changelog
 
+## v TBD
+
+### Added
+- **"Replace Dummy GUIDs" Tab Enhancements**:
+  - **Checkable GUID Table**: found GUIDs are displayed in a table with checkboxes (`☑` / `☐`) allowing selective replacement.
+  - **Selection Controls & Counter**: added `Select All` / `Deselect All` buttons, header column toggle, spacebar shortcut, and selection counter.
+  - **Right-Click Context Menu**: right-click on selected rows to select or deselect highlighted GUIDs for replacement.
+  - **Option "Use Dummy GUID Range from Settings"**: checkbox (default: true) to toggle between using the global settings dummy range or entering a custom dummy range directly on the tab.
+  - **Option "Replace all GUIDs not in own ranges"**: new checkbox option (default: false) to target all GUIDs outside own ranges.
+
 ## v0.6.1
 
 ### Added
@@ -8,6 +18,7 @@
   - **Checkable GUID Table**: found GUIDs are displayed in a table with checkboxes (`☑` / `☐`) allowing selective replacement.
   - **Selection Controls & Counter**: added `Select All` / `Deselect All` buttons, header column toggle, spacebar shortcut, and selection counter.
   - **Right-Click Context Menu**: right-click on selected rows to select or deselect highlighted GUIDs for replacement.
+  - **Option "Use Dummy GUID Range from Settings"**: checkbox (default: true) to toggle between using the global settings dummy range or entering a custom dummy range directly on the tab.
   - **Option "Replace all GUIDs not in own ranges"**: new checkbox option (default: false) to target all GUIDs outside own ranges.
 
 ## v0.6.0 (thx to Taludas)

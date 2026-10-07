@@ -246,6 +246,7 @@ class AppConfig:
         self.language = "en"
         self.auto_assign = False
         self.replace_non_own = False
+        self.use_settings_dummy = True
         #: "Mark as used when copied" checkbox in the Free GUIDs tab
         self.mark_used_on_copy = True
         #: "Show reserved" checkbox in the GUID Database tab
@@ -285,6 +286,7 @@ class AppConfig:
         self.language = s.get("language", self.language)
         self.auto_assign = s.get("auto_assign", "false").lower() == "true"
         self.replace_non_own = s.get("replace_non_own", "false").lower() == "true"
+        self.use_settings_dummy = s.get("use_settings_dummy", "true").lower() == "true"
         self.mark_used_on_copy = s.get("mark_used_on_copy", "true").lower() == "true"
         self.show_reserved_in_db = s.get("show_reserved_in_db", "true").lower() == "true"
         self.comment_language = (
@@ -319,6 +321,7 @@ class AppConfig:
         s["language"] = self.language
         s["auto_assign"] = str(bool(self.auto_assign)).lower()
         s["replace_non_own"] = str(bool(self.replace_non_own)).lower()
+        s["use_settings_dummy"] = str(bool(self.use_settings_dummy)).lower()
         s["mark_used_on_copy"] = str(bool(self.mark_used_on_copy)).lower()
         s["show_reserved_in_db"] = str(bool(self.show_reserved_in_db)).lower()
         s["comment_language"] = self.comment_language
