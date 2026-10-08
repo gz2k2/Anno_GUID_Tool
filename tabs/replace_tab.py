@@ -431,7 +431,7 @@ class ReplaceTab:
         self.update_selected_stats()
 
     def show_context_menu(self, event):
-        """Right-click menu: select / deselect highlighted rows for replacement."""
+        """Right-click menu: copy GUIDs or select / deselect rows for replacement."""
         item = self.tree.identify_row(event.y)
         if not item:
             return
@@ -444,6 +444,11 @@ class ReplaceTab:
 
         menu = tk.Menu(self.app, tearoff=0)
         menu.add_command(
+            label=tr("ctx_copy_guid") + suffix,
+            command=self.copy_selected_guids,
+        )
+        menu.add_separator()
+        menu.add_command(
             label=tr("ctx_select_replace") + suffix,
             command=lambda: self.set_dummies_selected(selected_rows, True),
         )
@@ -455,6 +460,14 @@ class ReplaceTab:
         menu.add_command(label=tr("btn_select_all"), command=self.select_all_dummies)
         menu.add_command(label=tr("btn_deselect_all"), command=self.deselect_all_dummies)
         menu.post(event.x_root, event.y_root)
+
+    def copy_selected_guids(self):
+        """Copy the GUIDs of the selected table rows to the clipboard."""
+        guids = self.tree.selection()
+        if not guids:
+            return
+        self.app.clipboard_clear()
+        self.app.clipboard_append("\n".join(guids))
 
     def _on_space_key(self, event):
         """Space key toggles replacement selection for all highlighted rows."""

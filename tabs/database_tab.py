@@ -454,6 +454,7 @@ class DatabaseTab:
         """Show the right-click menu for the selected rows.
 
         Entries:
+          * "Copy GUID" – copies the selected database GUIDs to the clipboard
           * "Migrate a mod to a free GUID…" – only for ONE selected red
             (colliding) GUID, see :meth:`migrate_collision`
           * "Move to <game>" – one entry for every game except the active one
@@ -480,12 +481,17 @@ class DatabaseTab:
         if item not in self.tree.selection():
             self.tree.selection_set(item)
 
-        count = len(self.tree.selection())
+        guids = self._selected_guids()
+        count = len(guids)
         suffix = f" ({count})" if count > 1 else ""
 
         menu = tk.Menu(self.app, tearoff=0)
+        menu.add_command(
+            label=self.app.tr("ctx_copy_guid") + suffix,
+            command=self.copy_selected_guids,
+        )
+        menu.add_separator()
 
-        guids = self._selected_guids()
         if len(guids) == 1 and self.app.db.is_collision(guids[0], self.app.reservations):
             menu.add_command(label=self.app.tr("ctx_migrate"),
                              command=lambda g=guids[0]: self.migrate_collision(g))
@@ -517,6 +523,14 @@ class DatabaseTab:
             for item in self.tree.selection()
             if self.tree.item(item, "values") and item not in self._reserved_lists
         ]
+
+    def copy_selected_guids(self):
+        """Copy the selected database GUIDs to the clipboard, one per line."""
+        guids = self._selected_guids()
+        if not guids:
+            return
+        self.app.clipboard_clear()
+        self.app.clipboard_append("\n".join(guids))
 
     def move_selected(self, target_key):
         """Move the selected GUIDs from the active game's database to ``target_key``.

@@ -68,6 +68,7 @@ On first start:
 | Register by drag & drop | Drag one or more mod folders / ZIP files from the Explorer onto the window (Windows only). The tool switches to this tab and shows one summary for all dropped mods. Other files are ignored. Works on every tab except **Replace Dummy GUIDs** (there a drop opens the mod instead). |
 | Search | Type in the search field. It filters by GUID, comment and location. |
 | Show reserved GUIDs | **Show reserved** shows the GUIDs reserved in the **Free GUIDs** lists that are not registered yet: one blue row per continuous range and project, with the project name as comment. Right-click → **Show in Free GUIDs** opens the project. Delete and Move ignore these rows. |
+| Copy GUIDs | Right-click one or more selected entries → **Copy GUID**. Selected GUIDs are copied one per line. |
 | Sort | Click the **GUID** or **Location** column heading. Click again to reverse the order (▲ ascending, ▼ descending). |
 | Export | **Export .csv** writes `GUID;Comment;Location`, separated by `;` (UTF-8) |
 | Delete | Button, `Del` key or right-click menu |
@@ -169,6 +170,7 @@ Reserved GUIDs, both free and used, are never suggested again, in any list. They
 2. Select which GUIDs to replace:
    - Click a row's checkbox (`☑` / `☐`) or press `Space` to toggle replacement selection for highlighted rows.
    - Right-click highlighted rows to choose **Select for replacement** or **Deselect for replacement**.
+   - Right-click a row and choose **Copy GUID** to copy the selected GUIDs to the clipboard (one per line).
    - Use **Select All** / **Deselect All** buttons (or click the **Replace** table heading) to toggle all items.
 3. Choose where assignment starts:
    - **Automatic:** start at the first own GUID and fill all free gaps.
@@ -345,6 +347,7 @@ Beim ersten Start:
 | Per Drag & Drop registrieren | Einen oder mehrere Mod-Ordner / ZIP-Dateien aus dem Explorer ins Fenster ziehen (nur Windows). Das Tool wechselt in diesen Tab und zeigt eine Zusammenfassung für alle Mods. Andere Dateien werden ignoriert. Funktioniert in jedem Tab außer **Dummy-GUIDs Ersetzen** (dort öffnet das Ziehen die Mod stattdessen). |
 | Suchen | In das Suchfeld tippen. Es filtert nach GUID, Kommentar und Ort. |
 | Reservierte GUIDs anzeigen | **Reservierte anzeigen** zeigt die in den Listen **Freie GUIDs** reservierten, noch nicht registrierten GUIDs: eine blaue Zeile pro zusammenhängendem Bereich und Projekt, mit dem Projektnamen als Kommentar. Rechtsklick → **In „Freie GUIDs“ anzeigen** öffnet das Projekt. Löschen und Verschieben ignorieren diese Zeilen. |
+| GUIDs kopieren | Eine oder mehrere Zeilen auswählen → Rechtsklick → **GUID kopieren**. Die ausgewählten GUIDs werden zeilenweise kopiert. |
 | Sortieren | Auf die Spaltenüberschrift **GUID** oder **Ort** klicken. Ein weiterer Klick kehrt die Reihenfolge um (▲ aufsteigend, ▼ absteigend). |
 | Exportieren | **Export .csv** schreibt `GUID;Kommentar;Ort`, getrennt durch `;` (UTF-8) |
 | Löschen | Button, `Entf`-Taste oder Rechtsklick-Menü |
@@ -446,6 +449,7 @@ Reservierte GUIDs, freie wie benutzte, werden in keiner Liste erneut vorgeschlag
 2. Anpassen, welche GUIDs ersetzt werden sollen:
    - Auf das **`☑` / `☐`** einer Zeile klicken oder die **Leertaste** drücken, um die Auswahl markierter Zeilen umzuschalten.
    - Rechtsklick auf markierte Zeilen → **Für Ersetzung auswählen** oder **Von Ersetzung abwählen**.
+   - Rechtsklick auf eine Zeile → **GUID kopieren**, um die ausgewählten GUIDs in die Zwischenablage zu kopieren (eine pro Zeile).
    - Mit den Buttons **Alle auswählen** / **Keine auswählen** (oder Klick auf die Tabellenüberschrift **Ersetzen**) alle Zeilen umschalten.
 3. Festlegen, wo die Vergabe beginnt:
    - **Automatisch:** ab der ersten eigenen GUID, freie Lücken werden gefüllt.

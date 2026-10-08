@@ -1,10 +1,17 @@
 # Changelog
 
+## v0.x.x
+
+### Added
+- **Copy GUID (Right-Click Menu)**: Added the ability to copy GUIDs from selected entries to the clipboard.
+
+
 ## v0.6.2
 
 ### Added
   - **Option "Use Dummy GUID Range from Settings"**: checkbox (default: true) to toggle between using the global settings dummy range or entering a custom dummy range directly on the tab.
   - **Option "Replace all GUIDs not in own ranges"**: new checkbox option (default: false) to target all GUIDs outside own ranges.
+
 
 ## v0.6.1
 
@@ -14,10 +21,9 @@
   - **Checkable GUID Table**: found GUIDs are displayed in a table with checkboxes (`☑` / `☐`) allowing selective replacement.
   - **Selection Controls & Counter**: added `Select All` / `Deselect All` buttons, header column toggle, spacebar shortcut, and selection counter.
   - **Right-Click Context Menu**: right-click on selected rows to select or deselect highlighted GUIDs for replacement.
-  - **Option "Use Dummy GUID Range from Settings"**: checkbox (default: true) to toggle between using the global settings dummy range or entering a custom dummy range directly on the tab.
-  - **Option "Replace all GUIDs not in own ranges"**: new checkbox option (default: false) to target all GUIDs outside own ranges.
 
-## v0.6.0 (thx to Taludas)
+
+## v0.6.0 (thx to Taludas https://github.com/taludas )
 
 ### Added
 - **GUID collision warning on import**: a dialog lists GUIDs of a registered mod that
