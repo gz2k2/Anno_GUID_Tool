@@ -251,6 +251,7 @@ class AppConfig:
         self.mark_used_on_copy = True
         #: "Show reserved" checkbox in the GUID Database tab
         self.show_reserved_in_db = True
+        self.group_guids_in_db = False
         #: texts_<language>.xml used for names ("Language Comment"), lower case
         self.comment_language = DEFAULT_COMMENT_LANGUAGE
         self.active_game = DEFAULT_GAME
@@ -289,6 +290,7 @@ class AppConfig:
         self.use_settings_dummy = s.get("use_settings_dummy", "true").lower() == "true"
         self.mark_used_on_copy = s.get("mark_used_on_copy", "true").lower() == "true"
         self.show_reserved_in_db = s.get("show_reserved_in_db", "true").lower() == "true"
+        self.group_guids_in_db = s.get("group_guids_in_db", "false").lower() == "true"
         self.comment_language = (
             s.get("comment_language", DEFAULT_COMMENT_LANGUAGE).strip().lower()
             or DEFAULT_COMMENT_LANGUAGE
@@ -324,6 +326,7 @@ class AppConfig:
         s["use_settings_dummy"] = str(bool(self.use_settings_dummy)).lower()
         s["mark_used_on_copy"] = str(bool(self.mark_used_on_copy)).lower()
         s["show_reserved_in_db"] = str(bool(self.show_reserved_in_db)).lower()
+        s["group_guids_in_db"] = str(bool(self.group_guids_in_db)).lower()
         s["comment_language"] = self.comment_language
         s["active_game"] = self.active_game
 

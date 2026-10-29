@@ -128,7 +128,20 @@ class ReserveTab:
         )
         self.btn_delete_list.pack(side="left", padx=5, pady=5)
 
-        # --- Row 1: count + suggest / extend (left), copy next (right) -
+        # --- Row 1: optional custom start GUID -------------------------
+        start_frame = ctk.CTkFrame(self.parent, fg_color="transparent")
+        start_frame.pack(padx=10, pady=(5, 0), fill="x")
+
+        self.var_use_own_start = tk.BooleanVar(value=False)
+        self.chk_use_own_start = ctk.CTkCheckBox(
+            start_frame, text="", variable=self.var_use_own_start,
+            command=self._on_use_own_start_toggled,
+        )
+        self.chk_use_own_start.pack(side="left", padx=(15, 5), pady=5)
+        self.entry_own_start = ctk.CTkEntry(start_frame, width=110)
+        self.entry_own_start.bind("<Return>", lambda e: self.suggest_block())
+
+        # --- Row 2: count + suggest / extend (left), copy next (right) -
         top_frame = ctk.CTkFrame(self.parent)
         top_frame.pack(padx=10, pady=(5, 0), fill="x")
 
@@ -233,6 +246,7 @@ class ReserveTab:
         self.btn_rename_list.configure(text=tr("res_btn_rename_list"))
         self.btn_delete_list.configure(text=tr("res_btn_delete_list"))
         self.lbl_count.configure(text=tr("res_lbl_count"))
+        self.chk_use_own_start.configure(text=tr("res_chk_use_own_start"))
         self.btn_suggest.configure(text=tr("res_btn_suggest"))
         self.btn_extend.configure(text=tr("res_btn_extend"))
         self.btn_copy_next.configure(text=tr("res_btn_copy_next"))
@@ -398,6 +412,31 @@ class ReserveTab:
     # ==================================================================
     # Suggest / Extend
     # ==================================================================
+    def _on_use_own_start_toggled(self):
+        """Show the custom start GUID field only while the option is enabled."""
+        if self.var_use_own_start.get():
+            self.entry_own_start.pack(side="left", padx=(0, 10), pady=5,
+                                      after=self.chk_use_own_start)
+            if not self.entry_own_start.get().strip():
+                self.entry_own_start.insert(0, str(self.app.game.first_own_guid))
+            self.entry_own_start.focus_set()
+        else:
+            self.entry_own_start.pack_forget()
+
+    def _read_own_start_guid(self):
+        """Return a validated custom start GUID, or None after showing an error."""
+        value = self.entry_own_start.get().strip()
+        try:
+            start_guid = int(value)
+        except ValueError:
+            start_guid = -1
+        if start_guid < 0 or not self.app.game.is_own_guid(str(start_guid)):
+            tr = self.app.tr
+            messagebox.showerror(tr("msg_res_err_start_title"),
+                                 tr("msg_res_err_start").format(self.app.game.own_ranges_text))
+            return None
+        return start_guid
+
     def _read_count(self):
         """Number of GUIDs from the input field, or None (after an error message)."""
         try:
@@ -437,6 +476,30 @@ class ReserveTab:
         if count is None:
             return
         game = self.app.game
+        if self.var_use_own_start.get():
+            start_guid = self._read_own_start_guid()
+            if start_guid is None:
+                return
+            block = [str(guid) for guid in range(start_guid, start_guid + count)]
+            end_guid = start_guid + count - 1
+            if (not game.is_own_guid(str(end_guid))
+                    or any(guid in self.app.db or guid in self.app.reservations.taken()
+                           for guid in block)):
+                messagebox.showerror(
+                    self.app.tr("msg_res_start_collision_title"),
+                    self.app.tr("msg_res_start_collision").format(start_guid, end_guid),
+                )
+                return
+            res = self.app.reservations
+            if res.active is None:
+                res.add_list(self.app.tr("res_default_list"))
+            res.add(block)
+            res.save()
+            self.refresh_view()
+            self.tree.see(block[0])
+            self._show_feedback(self.app.tr("res_feedback_added").format(guid_runs(block)))
+            return
+
         self._reserve_block(count, game.first_own_guid,
                             self.app.tr("msg_res_no_block").format(count, game.own_ranges_text))
 
@@ -551,6 +614,9 @@ class ReserveTab:
             if not selection:
                 return
             guid = selection[0]
+            guids = list(selection)
+        else:
+            guids = [guid]
         self._close_editor(save=True)
         self.tree.see(guid)
         self.tree.update_idletasks()
@@ -576,32 +642,42 @@ class ReserveTab:
         editor.bind("<KP_Enter>", lambda e: self._close_editor(save=True))
         editor.bind("<Escape>", lambda e: self._close_editor(save=False))
         editor.bind("<FocusOut>", lambda e: self._close_editor(save=True))
-        self._editor = (editor, guid)
+        self._editor = (editor, guids)
 
     def _close_editor(self, save):
         """Close the inline editor; store its text if ``save``."""
         if self._editor is None:
             return
-        editor, guid = self._editor
+        editor, guids = self._editor
         self._editor = None   # first, so FocusOut during destroy does nothing
         text = editor.get().strip()
         editor.destroy()
         if save:
-            self.set_comment(guid, text)
+            self.set_comments(guids, text)
         self.tree.focus_set()
 
     def set_comment(self, guid, text):
-        """Store the comment of a reserved GUID (see :meth:`edit_comment`)."""
-        if guid in self.app.db:
-            if self.app.db.set_comment(guid, text):
-                self.app.db.save()
-        else:
-            res = self.app.reservations
-            if res.comment(guid) == text:
-                return
-            res.set_comment(guid, text)
+        """Store one comment; retained for callers that target a single GUID."""
+        self.set_comments([guid], text)
+
+    def set_comments(self, guids, text):
+        """Apply the same comment to all selected reserved GUIDs."""
+        text = text.strip()
+        db_changed = False
+        reservations_changed = False
+        res = self.app.reservations
+        for guid in guids:
+            if guid in self.app.db:
+                db_changed = self.app.db.set_comment(guid, text) or db_changed
+            elif res.comment(guid) != text:
+                res.set_comment(guid, text)
+                reservations_changed = True
+        if db_changed:
+            self.app.db.save()
+        if reservations_changed:
             res.save()
-        self.refresh_view()
+        if db_changed or reservations_changed:
+            self.refresh_view()
 
     def select_all(self, event=None):
         """Select all rows (Ctrl+A)."""
@@ -624,8 +700,7 @@ class ReserveTab:
 
         menu = tk.Menu(self.app, tearoff=0)
         menu.add_command(label=tr("res_ctx_copy") + suffix, command=self.copy_selected)
-        if len(guids) == 1:
-            menu.add_command(label=tr("res_ctx_edit_comment"), command=lambda: self.edit_comment(guids[0]))
+        menu.add_command(label=tr("res_ctx_edit_comment") + suffix, command=self.edit_comment)
         menu.add_command(label=tr("res_ctx_mark_used") + suffix,
                          command=lambda: self.set_used(guids, True))
         menu.add_command(label=tr("res_ctx_mark_free") + suffix,

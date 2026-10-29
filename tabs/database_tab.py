@@ -171,6 +171,23 @@ class DatabaseTab:
         # Re-filter the table on every key stroke.
         self.entry_search.bind("<KeyRelease>", self.refresh_view)
 
+        # --- Grouping option above the statistics bar ------------------
+        group_frame = ctk.CTkFrame(self.parent, fg_color="transparent")
+        group_frame.pack(padx=10, pady=(5, 0), fill="x")
+        self.var_group_guids = tk.BooleanVar(value=self.app.settings.group_guids_in_db)
+        self.chk_group_guids = ctk.CTkCheckBox(
+            group_frame, text="", variable=self.var_group_guids,
+            command=self._on_group_guids_toggled,
+        )
+        self.chk_group_guids.pack(side="left", padx=(15, 8), pady=5)
+
+        self.var_show_reserved = tk.BooleanVar(value=self.app.settings.show_reserved_in_db)
+        self.chk_show_reserved = ctk.CTkCheckBox(
+            group_frame, text="", variable=self.var_show_reserved,
+            command=self._on_show_reserved_toggled,
+        )
+        self.chk_show_reserved.pack(side="left", padx=8, pady=5)
+
         # --- Statistics bar ("Registered GUIDs: N") -------------------
         stats_frame = ctk.CTkFrame(self.parent)
         stats_frame.pack(padx=10, pady=(5, 5), fill="x")
@@ -178,12 +195,6 @@ class DatabaseTab:
         self.lbl_stats = ctk.CTkLabel(stats_frame, text="", font=ctk.CTkFont(size=14, weight="bold"))
         self.lbl_stats.pack(side="left", anchor="w", padx=15, pady=8)
 
-        self.var_show_reserved = tk.BooleanVar(value=self.app.settings.show_reserved_in_db)
-        self.chk_show_reserved = ctk.CTkCheckBox(
-            stats_frame, text="", variable=self.var_show_reserved,
-            command=self._on_show_reserved_toggled,
-        )
-        self.chk_show_reserved.pack(side="left", padx=15, pady=8)
         #: list name per reserved-range row id (for the right-click jump)
         self._reserved_lists = {}
 
@@ -276,6 +287,7 @@ class DatabaseTab:
         self.entry_search.configure(placeholder_text=tr("search_ph"))
         self.lbl_drop_hint.configure(text=tr("drop_hint"))
         self.chk_show_reserved.configure(text=tr("chk_show_reserved"))
+        self.chk_group_guids.configure(text=tr("chk_group_guids"))
         self._update_headings()
         self._update_stats()
 
@@ -338,7 +350,17 @@ class DatabaseTab:
 
         # Rows: (sort key, values, tags, list name for reserved rows).
         rows = []
+        grouped_guids = set()
+        if self.var_group_guids.get():
+            for package, start, end, matches in self.app.mod_packages.matching_ranges(self.app.db.entries):
+                range_text = f"{start} - {end}"
+                if not query or query in range_text.lower() or query in package.lower():
+                    rows.append((guid_sort_key(str(start)), (range_text, package, ""),
+                                 ("package",), None))
+                grouped_guids.update(matches)
         for guid, comment, locations in self.app.db.sorted_items():
+            if guid in grouped_guids:
+                continue
             location_str = ", ".join(locations)
             if query and not any(query in text.lower() for text in (guid, comment, location_str)):
                 continue
@@ -365,10 +387,17 @@ class DatabaseTab:
         dark = 1 if ctk.get_appearance_mode() == "Dark" else 0
         self.tree.tag_configure("collision", foreground=COLLISION_COLOR[dark])
         self.tree.tag_configure("reserved", foreground=RESERVED_COLOR[dark])
+        self.tree.tag_configure("package", foreground=("#1b7f35", "#51cf66")[dark])
         self._reserved_lists = {}
+        self._package_rows = set()
         for index, (_, values, tags, list_name) in enumerate(rows):
             if list_name is None:
-                self.tree.insert("", "end", values=values, tags=tags)
+                if "package" in tags:
+                    iid = f"package:{index}"
+                    self._package_rows.add(iid)
+                    self.tree.insert("", "end", iid=iid, values=values, tags=tags)
+                else:
+                    self.tree.insert("", "end", values=values, tags=tags)
             else:
                 iid = f"{RESERVED_IID}{index}"
                 self._reserved_lists[iid] = list_name
@@ -414,6 +443,12 @@ class DatabaseTab:
                 ))
         return rows
 
+    def _on_group_guids_toggled(self):
+        """Persist package grouping and rebuild the database table."""
+        self.app.settings.group_guids_in_db = bool(self.var_group_guids.get())
+        self.app.settings.save()
+        self.refresh_view()
+
     def _on_show_reserved_toggled(self):
         """Persist the "Show reserved" checkbox and refresh the table."""
         self.app.settings.show_reserved_in_db = bool(self.var_show_reserved.get())
@@ -450,6 +485,78 @@ class DatabaseTab:
             self.tree.selection_set(children)
         return "break"
 
+    def convert_free_guids_to_mod_package(self, list_name):
+        """Convert all still-unregistered ranges of a Free GUIDs project to a Mod Package."""
+        items = self.app.reservations.lists.get(list_name, {})
+        source_guids = list(items)
+        ranges = [(int(first), int(last)) for first, last, _ in guid_ranges(source_guids)]
+        if not ranges:
+            messagebox.showwarning(self.app.tr("pkg_error"),
+                                   self.app.tr("pkg_convert_empty"))
+            return
+
+        if not messagebox.askyesno(
+                self.app.tr("pkg_convert_confirm_title"),
+                self.app.tr("pkg_convert_confirm").format(list_name),
+                icon=messagebox.WARNING,
+                parent=self.app):
+            return
+
+        model = self.app.mod_packages
+        created = False
+        if list_name not in model.packages:
+            if not model.add(list_name):
+                messagebox.showerror(self.app.tr("pkg_error"),
+                                     self.app.tr("pkg_name_invalid"))
+                return
+            created = True
+
+        existing = list(model.packages[list_name])
+        for start, end in ranges:
+            if any(own_start <= start and end <= own_end for own_start, own_end in existing):
+                continue
+            conflict = model.overlapping_package(start, end)
+            if conflict is not None and conflict != list_name:
+                if created:
+                    model.delete(list_name)
+                messagebox.showerror(self.app.tr("pkg_error"),
+                                     self.app.tr("pkg_convert_conflict").format(conflict))
+                return
+
+        # Add every individual GUID so overlapping/adjacent own ranges are compacted safely.
+        guids = [str(number) for start, end in ranges for number in range(start, end + 1)]
+        added, conflict = model.add_guids(list_name, guids)
+        if conflict:
+            if created:
+                model.delete(list_name)
+            messagebox.showerror(self.app.tr("pkg_error"),
+                                 self.app.tr("pkg_convert_conflict").format(conflict))
+            return
+        # Conversion is a move: after the package was saved successfully,
+        # remove the complete source project from Free GUIDs so the same GUIDs
+        # are not managed in both places.
+        # Every converted Free GUID becomes a real database entry as well.
+        # Existing database entries are preserved; new entries inherit their
+        # planning comment from the Free GUIDs project when one exists.
+        for guid in source_guids:
+            planning_comment = items.get(guid, {}).get("comment", "")
+            self.app.db.add_guid(guid, planning_comment)
+        self.app.db.save()
+
+        model.active = list_name
+        model.save()
+        self.app.reservations.delete_list(list_name)
+        self.app.reservations.save()
+
+        # Recreate all active persistence models from disk before rebuilding
+        # the Treeviews. This prevents stale in-memory rows after the move.
+        self.app.reload_active_data()
+        self.app.mod_package_tab.refresh_view()
+        self.app.reserve_tab.refresh_view()
+        self.refresh_view()
+        messagebox.showinfo(self.app.tr("pkg_convert_title"),
+                            self.app.tr("pkg_convert_done").format(list_name, added))
+
     def show_context_menu(self, event):
         """Show the right-click menu for the selected rows.
 
@@ -469,6 +576,8 @@ class DatabaseTab:
         item = self.tree.identify_row(event.y)
         if not item:
             return
+        if item in getattr(self, "_package_rows", set()):
+            return
         # Reserved-range row: only the jump to its project.
         if item in self._reserved_lists:
             self.tree.selection_set(item)
@@ -476,6 +585,8 @@ class DatabaseTab:
             menu = tk.Menu(self.app, tearoff=0)
             menu.add_command(label=self.app.tr("ctx_show_in_free").format(name),
                              command=lambda: self.show_in_free_guids(name))
+            menu.add_command(label=self.app.tr("ctx_convert_to_mod_package"),
+                             command=lambda: self.convert_free_guids_to_mod_package(name))
             menu.post(event.x_root, event.y_root)
             return
         if item not in self.tree.selection():
@@ -489,6 +600,10 @@ class DatabaseTab:
         menu.add_command(
             label=self.app.tr("ctx_copy_guid") + suffix,
             command=self.copy_selected_guids,
+        )
+        menu.add_command(
+            label=self.app.tr("ctx_add_to_mod_package") + suffix,
+            command=self.add_selected_to_mod_package,
         )
         menu.add_separator()
 
@@ -521,8 +636,59 @@ class DatabaseTab:
         return [
             str(self.tree.item(item, "values")[0]).removesuffix(COLLISION_MARK)
             for item in self.tree.selection()
-            if self.tree.item(item, "values") and item not in self._reserved_lists
+            if (self.tree.item(item, "values") and item not in self._reserved_lists
+                and item not in getattr(self, "_package_rows", set()))
         ]
+
+    def add_selected_to_mod_package(self):
+        """Open a package chooser and add all selected database GUIDs to it."""
+        guids = self._selected_guids()
+        packages = self.app.mod_packages.names()
+        if not guids:
+            return
+        if not packages:
+            messagebox.showwarning(self.app.tr("pkg_error"),
+                                   self.app.tr("pkg_no_packages"))
+            return
+
+        dialog = tk.Toplevel(self.app)
+        dialog.title(self.app.tr("pkg_choose_title"))
+        dialog.transient(self.app)
+        dialog.grab_set()
+        dialog.resizable(False, False)
+
+        tk.Label(dialog, text=self.app.tr("pkg_choose_prompt")).pack(
+            padx=20, pady=(18, 8), anchor="w")
+        selected = tk.StringVar(value=packages[0])
+        combo = ttk.Combobox(dialog, textvariable=selected, values=packages,
+                             state="readonly", width=max(24, max(map(len, packages))))
+        combo.pack(padx=20, pady=(0, 14), fill="x")
+        combo.focus_set()
+
+        buttons = tk.Frame(dialog)
+        buttons.pack(padx=20, pady=(0, 18), fill="x")
+        tk.Button(buttons, text=self.app.tr("btn_cancel"), command=dialog.destroy).pack(side="right")
+        tk.Button(buttons, text=self.app.tr("pkg_add_button"),
+                  command=lambda: self._confirm_add_to_mod_package(
+                      dialog, selected.get(), guids)).pack(side="right", padx=(0, 8))
+        dialog.bind("<Escape>", lambda event: dialog.destroy())
+        dialog.bind("<Return>", lambda event: self._confirm_add_to_mod_package(
+            dialog, selected.get(), guids))
+
+    def _confirm_add_to_mod_package(self, dialog, package, guids):
+        """Apply a package choice made in :meth:`add_selected_to_mod_package`."""
+        added, conflict = self.app.mod_packages.add_guids(package, guids)
+        if conflict:
+            messagebox.showerror(self.app.tr("pkg_error"),
+                                 self.app.tr("pkg_add_conflict").format(conflict),
+                                 parent=dialog)
+            return
+        if added:
+            self.app.mod_packages.active = package
+            self.app.mod_packages.save()
+            self.app.mod_package_tab.refresh_view()
+            self.refresh_view()
+        dialog.destroy()
 
     def copy_selected_guids(self):
         """Copy the selected database GUIDs to the clipboard, one per line."""

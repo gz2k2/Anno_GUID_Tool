@@ -49,11 +49,13 @@ from core.constants import APP_AUTHOR, APP_NAME, GAMES
 from core.file_drop import enable_file_drop
 from core.guid_database import GuidDatabase, migrate_legacy_database
 from core.guid_reservations import GuidReservations
+from core.mod_packages import ModPackages
 from core.translations import TRANSLATIONS
 from core.xml_scanner import split_mod_paths
 from core.update_checker import GITHUB_REPO_URL, KOFI_URL, check_for_update_async
 from core.version import read_version
 from tabs.database_tab import DatabaseTab
+from tabs.mod_package_tab import ModPackageTab
 from tabs.replace_tab import ReplaceTab
 from tabs.reserve_tab import ReserveTab
 from dialogs.update_dialog import UpdateDialog
@@ -62,6 +64,7 @@ from tabs.settings_tab import SettingsTab
 # Internal tab identifiers. CTkTabview uses the tab *name* as key, so fixed
 # keys are used and only the visible button text is translated later.
 TAB_KEY_DB = "tab_db"
+TAB_KEY_PACKAGE = "tab_package"
 TAB_KEY_RESERVE = "tab_reserve"
 TAB_KEY_ASSIGN = "tab_assign"
 TAB_KEY_SETTINGS = "tab_settings"
@@ -103,6 +106,9 @@ class GUIDManagerApp(ctk.CTk):
 
         #: dict game key -> GuidReservations ("Free GUIDs" tab, one JSON file per game)
         self.all_reservations = {key: GuidReservations(info["reserve_file"]) for key, info in GAMES.items()}
+        self.all_mod_packages = {
+            key: ModPackages(f"mod_packages_{key}.json") for key in GAMES
+        }
 
         # Theme must be applied BEFORE widgets are created.
         ctk.set_appearance_mode(self.settings.appearance_mode)
@@ -149,11 +155,13 @@ class GUIDManagerApp(ctk.CTk):
         self.tabview.pack(padx=20, pady=(10, 20), fill="both", expand=True)
 
         frame_db = self.tabview.add(TAB_KEY_DB)
+        frame_package = self.tabview.add(TAB_KEY_PACKAGE)
         frame_reserve = self.tabview.add(TAB_KEY_RESERVE)
         frame_assign = self.tabview.add(TAB_KEY_ASSIGN)
         frame_settings = self.tabview.add(TAB_KEY_SETTINGS)
 
         self.database_tab = DatabaseTab(self, frame_db)
+        self.mod_package_tab = ModPackageTab(self, frame_package)
         self.reserve_tab = ReserveTab(self, frame_reserve)
         self.replace_tab = ReplaceTab(self, frame_assign)
         self.settings_tab = SettingsTab(self, frame_settings)
@@ -286,9 +294,21 @@ class GUIDManagerApp(ctk.CTk):
         return self.databases[self.settings.active_game]
 
     @property
+    def mod_packages(self):
+        """:class:`ModPackages` of the active game."""
+        return self.all_mod_packages[self.settings.active_game]
+
+    @property
     def reservations(self):
         """:class:`GuidReservations` (reserved GUIDs) of the active game."""
         return self.all_reservations[self.settings.active_game]
+
+    def reload_active_data(self):
+        """Reload the active game's database, reservations and packages from disk."""
+        key = self.settings.active_game
+        self.databases[key] = GuidDatabase(self.databases[key].path)
+        self.all_reservations[key] = GuidReservations(self.all_reservations[key].path)
+        self.all_mod_packages[key] = ModPackages(self.all_mod_packages[key].path)
 
     def show_reserve_tab(self):
         """Switch to the "Free GUIDs" tab (e.g. from the database's right-click menu)."""
@@ -302,7 +322,9 @@ class GUIDManagerApp(ctk.CTk):
         the other tabs change (import, delete, move, replace). Likewise the
         database table shows the reserved ranges of the Free GUIDs lists.
         """
-        if self.tabview.get() == TAB_KEY_RESERVE:
+        if self.tabview.get() == TAB_KEY_PACKAGE:
+            self.mod_package_tab.refresh_view()
+        elif self.tabview.get() == TAB_KEY_RESERVE:
             self.reserve_tab.refresh_view()
         elif self.tabview.get() == TAB_KEY_DB:
             self.database_tab.refresh_view()
@@ -322,6 +344,7 @@ class GUIDManagerApp(ctk.CTk):
 
         self._update_title()
         self.database_tab.refresh_view()
+        self.mod_package_tab.refresh_view()
         self.reserve_tab.refresh_view()
         self.replace_tab.on_game_changed()
 
@@ -360,13 +383,14 @@ class GUIDManagerApp(ctk.CTk):
         # internal structure changes in a future CustomTkinter version.
         try:
             buttons = self.tabview._segmented_button._buttons_dict
-            for key in (TAB_KEY_DB, TAB_KEY_RESERVE, TAB_KEY_ASSIGN, TAB_KEY_SETTINGS):
+            for key in (TAB_KEY_DB, TAB_KEY_PACKAGE, TAB_KEY_RESERVE, TAB_KEY_ASSIGN, TAB_KEY_SETTINGS):
                 if key in buttons:
                     buttons[key].configure(text=self.tr(key))
         except Exception as e:
             print(f"Error updating tab captions: {e}")
 
         self.database_tab.update_language()
+        self.mod_package_tab.update_language()
         self.reserve_tab.update_language()
         self.replace_tab.update_language()
         self.settings_tab.update_language()

@@ -148,6 +148,18 @@ class GuidDatabase:
     # ------------------------------------------------------------------
     # Modification
     # ------------------------------------------------------------------
+    def add_guid(self, guid, comment=""):
+        """Create a GUID database entry without inventing a file location.
+
+        Existing entries are left unchanged. This is used when a reserved
+        Free GUID is converted into a Mod Package before it occurs in a mod file.
+        """
+        guid = str(guid)
+        if guid in self.entries:
+            return False
+        self.entries[guid] = _new_entry([], comment.strip())
+        return True
+
     def add_location(self, guid, location):
         """Register ``guid`` as used in ``location``.
 
