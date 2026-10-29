@@ -67,8 +67,8 @@ On first start:
 | Register a mod | **Register Folder in DB** or **Register ZIP in DB** |
 | Register by drag & drop | Drag one or more mod folders / ZIP files from the Explorer onto the window (Windows only). The tool switches to this tab and shows one summary for all dropped mods. Other files are ignored. Works on every tab except **Replace Dummy GUIDs** (there a drop opens the mod instead). |
 | Search | Type in the search field. It filters by GUID, comment and location. |
-| Show reserved GUIDs | **Show reserved** shows the GUIDs reserved in the **Free GUIDs** lists that are not registered yet: one blue row per continuous range and project, with the project name as comment. Right-click → **Show in Free GUIDs** opens the project. Delete and Move ignore these rows. |
-| Copy GUIDs | Right-click one or more selected entries → **Copy GUID**. Selected GUIDs are copied one per line. |
+| Package and reserved views | **Package View** groups registered GUIDs covered by Mod Packages into green range rows with the package name as comment. **Show reserved** is directly beside it and shows Free GUID reservations as blue range rows. Reserved rows provide **Show in Free GUIDs** and **Convert to Mod Package**. |
+| GUID context actions | Right-click one or more selected GUIDs → **Copy GUID** or **Add to Mod Package**. |
 | Sort | Click the **GUID** or **Location** column heading. Click again to reverse the order (▲ ascending, ▼ descending). |
 | Export | **Export .csv** writes `GUID;Comment;Location`, separated by `;` (UTF-8) |
 | Delete | Button, `Del` key or right-click menu |
@@ -136,9 +136,23 @@ When you accept a collision with another mod, the comment of the mod that had th
 
 The report can be exported as CSV.
 
+#### Tab "Mod Package"
+
+Use this tab to organize GUIDs in named packages with one or more inclusive GUID ranges.
+
+1. Select a Mod Package from the drop-down or use **New**, **Rename** and **Delete**.
+2. Enter **GUID Start** and **GUID End**, then click **+** to add a range. Ranges of different Mod Packages must not overlap.
+3. The table shows only ranges of the selected Mod Package, supports multiple selection, and resizes its columns dynamically.
+4. Select one or more ranges and use **−** or right-click → **Remove**.
+5. In **GUID Database**, right-click one or more registered GUIDs → **Add to Mod Package**, then select an existing package. Missing GUIDs are inserted and adjacent GUIDs are merged into ranges.
+6. A Free GUID row offers **Convert to Mod Package**. After confirmation, all GUIDs are registered in the GUID Database, planning comments are retained for new entries, the package is created or extended, and the source Free GUID project is removed. Database, reservations and packages are reloaded from disk afterwards.
+7. Enable **Package View** in **GUID Database** to show package ranges as green rows with the package name in the Comment column. **Show reserved** is directly beside it.
+
 #### Tab "Free GUIDs"
 
 Use this tab while you are still writing a mod and need real GUIDs right away.
+
+Enable **Use own start GUID** to enter an exact start GUID. The field is visible only while enabled, and the complete requested block is checked against database entries and all reservations before it is created.
 
 **Mod projects.** Reserved GUIDs are kept in one list per mod project. Choose the list in **Mod project**, or create, rename and delete lists with **New**, **Rename** and **Delete**. Everything below works on the selected list. If there is no list yet, the first **Suggest Free Block** creates one ("My Mod"). Deleting a list releases its GUIDs.
 
@@ -215,6 +229,7 @@ Rules checked when you save:
 | `guid_database_anno117.json` | Working directory | GUID database for Anno 117 |
 | `guid_database_anno1800.json` | Working directory | GUID database for Anno 1800 |
 | `guid_reservations_anno117.json` / `guid_reservations_anno1800.json` | Working directory | GUIDs reserved in the **Free GUIDs** tab, one list per mod project, per game |
+| `mod_packages_anno117.json` / `mod_packages_anno1800.json` | Working directory | Mod Package names and inclusive GUID ranges, per game |
 | `version.txt` | Next to `main.py` (or the `.exe`) | Program version shown in the title, e.g. `v1.23.45` |
 
 Example `config.ini`:
@@ -265,6 +280,7 @@ AnnoGUIDTool/
 │   ├── file_drop.py        Drag & drop from the Explorer (Win32 via ctypes)
 │   ├── guid_database.py    JSON database, free GUID allocation, migration
 │   ├── guid_reservations.py GUIDs reserved in the "Free GUIDs" tab
+│   ├── mod_packages.py      Mod Package ranges and persistence
 │   ├── xml_scanner.py      Read and rewrite XML files in folders and ZIPs
 │   └── version.py          Reads version.txt
 ├── dialogs/
@@ -274,6 +290,7 @@ AnnoGUIDTool/
 │   └── update_dialog.py    "New version available" popup
 └── tabs/
     ├── database_tab.py     Tab "GUID Database"
+    ├── mod_package_tab.py  Tab "Mod Package"
     ├── reserve_tab.py      Tab "Free GUIDs"
     ├── replace_tab.py      Tab "Replace Dummy GUIDs"
     └── settings_tab.py     Tab "Settings"
@@ -346,8 +363,8 @@ Beim ersten Start:
 | Mod registrieren | **Ordner in DB registrieren** oder **ZIP in DB registrieren** |
 | Per Drag & Drop registrieren | Einen oder mehrere Mod-Ordner / ZIP-Dateien aus dem Explorer ins Fenster ziehen (nur Windows). Das Tool wechselt in diesen Tab und zeigt eine Zusammenfassung für alle Mods. Andere Dateien werden ignoriert. Funktioniert in jedem Tab außer **Dummy-GUIDs Ersetzen** (dort öffnet das Ziehen die Mod stattdessen). |
 | Suchen | In das Suchfeld tippen. Es filtert nach GUID, Kommentar und Ort. |
-| Reservierte GUIDs anzeigen | **Reservierte anzeigen** zeigt die in den Listen **Freie GUIDs** reservierten, noch nicht registrierten GUIDs: eine blaue Zeile pro zusammenhängendem Bereich und Projekt, mit dem Projektnamen als Kommentar. Rechtsklick → **In „Freie GUIDs“ anzeigen** öffnet das Projekt. Löschen und Verschieben ignorieren diese Zeilen. |
-| GUIDs kopieren | Eine oder mehrere Zeilen auswählen → Rechtsklick → **GUID kopieren**. Die ausgewählten GUIDs werden zeilenweise kopiert. |
+| Package- und Reservierungsansicht | **Package View** gruppiert registrierte GUIDs aus Mod Packages als grüne Bereichszeilen mit dem Package-Namen als Kommentar. **Reservierte anzeigen** steht direkt daneben. Reservierungszeilen bieten **In Freie GUIDs anzeigen** und **Convert to Mod Package**. |
+| GUID-Kontextaktionen | Rechtsklick auf eine oder mehrere ausgewählte GUIDs → **GUID kopieren** oder **Add to Mod Package**. |
 | Sortieren | Auf die Spaltenüberschrift **GUID** oder **Ort** klicken. Ein weiterer Klick kehrt die Reihenfolge um (▲ aufsteigend, ▼ absteigend). |
 | Exportieren | **Export .csv** schreibt `GUID;Kommentar;Ort`, getrennt durch `;` (UTF-8) |
 | Löschen | Button, `Entf`-Taste oder Rechtsklick-Menü |
@@ -414,6 +431,18 @@ Akzeptierst du eine Kollision mit einer anderen Mod, bleibt der Kommentar der Mo
 - GUIDs der geprüften Mods, die in deinen Listen **Freie GUIDs** reserviert sind
 
 Der Bericht lässt sich als CSV exportieren.
+
+#### Tab „Mod Package“
+
+Dieser Tab organisiert GUIDs in benannten Packages mit einem oder mehreren inklusiven GUID-Bereichen.
+
+1. Ein Mod Package im Dropdown auswählen oder mit **New**, **Rename** und **Delete** verwalten.
+2. **GUID Start** und **GUID End** eingeben und mit **+** einen Bereich hinzufügen. Bereiche verschiedener Mod Packages dürfen sich nicht überschneiden.
+3. Die Tabelle zeigt nur Bereiche des ausgewählten Mod Package, unterstützt Mehrfachauswahl und passt die Spaltenbreiten dynamisch an.
+4. Eine oder mehrere Zeilen auswählen und mit **−** oder Rechtsklick → **Remove** löschen.
+5. In der **GUID Datenbank** eine oder mehrere registrierte GUIDs per Rechtsklick → **Add to Mod Package** einem vorhandenen Package hinzufügen. Fehlende GUIDs werden ergänzt und benachbarte GUIDs zu Bereichen zusammengeführt.
+6. Eine Free-GUID-Zeile bietet **Convert to Mod Package**. Nach Bestätigung werden alle GUIDs in die GUID-Datenbank eingetragen, Planungskommentare für neue Einträge übernommen, das Package angelegt oder erweitert und das ursprüngliche Free-GUID-Projekt entfernt. Anschließend werden Datenbank, Reservierungen und Packages neu eingelesen.
+7. **Package View** in der **GUID Datenbank** zeigt Package-Bereiche als grüne Zeilen mit dem Package-Namen in der Kommentarspalte. **Reservierte anzeigen** steht direkt daneben.
 
 #### Tab „Freie GUIDs“
 
@@ -494,6 +523,7 @@ Diese Regeln werden beim Speichern geprüft:
 | `guid_database_anno117.json` | Arbeitsverzeichnis | GUID-Datenbank für Anno 117 |
 | `guid_database_anno1800.json` | Arbeitsverzeichnis | GUID-Datenbank für Anno 1800 |
 | `guid_reservations_anno117.json` / `guid_reservations_anno1800.json` | Arbeitsverzeichnis | Im Tab **Freie GUIDs** reservierte GUIDs, eine Liste pro Mod-Projekt, pro Spiel |
+| `mod_packages_anno117.json` / `mod_packages_anno1800.json` | Arbeitsverzeichnis | Namen und inklusive GUID-Bereiche der Mod Packages, pro Spiel |
 | `version.txt` | Neben `main.py` (bzw. der `.exe`) | Programmversion für die Titelleiste, z. B. `v1.23.45` |
 
 Die Formate von `config.ini` und den Datenbanken findest du oben im englischen Teil unter [Files](#files).
@@ -519,6 +549,7 @@ AnnoGUIDTool/
 │   ├── file_drop.py        Drag & Drop aus dem Explorer (Win32 über ctypes)
 │   ├── guid_database.py    JSON-Datenbank, Vergabe freier GUIDs, Migration
 │   ├── guid_reservations.py Im Tab „Freie GUIDs“ reservierte GUIDs
+│   ├── mod_packages.py      Mod-Package-Bereiche und Speicherung
 │   ├── xml_scanner.py      XML-Dateien in Ordnern und ZIPs lesen und schreiben
 │   └── version.py          Liest version.txt
 ├── dialogs/
@@ -528,6 +559,7 @@ AnnoGUIDTool/
 │   └── update_dialog.py    Hinweis „Neue Version verfügbar“
 └── tabs/
     ├── database_tab.py     Tab „GUID Datenbank“
+    ├── mod_package_tab.py  Tab „Mod Package“
     ├── reserve_tab.py      Tab „Freie GUIDs“
     ├── replace_tab.py      Tab „Dummy-GUIDs Ersetzen“
     └── settings_tab.py     Tab „Einstellungen“
