@@ -59,6 +59,7 @@ from tabs.mod_package_tab import ModPackageTab
 from tabs.replace_tab import ReplaceTab
 from tabs.reserve_tab import ReserveTab
 from dialogs.update_dialog import UpdateDialog
+from dialogs.styled_dialogs import install_styled_dialogs
 from tabs.settings_tab import SettingsTab
 
 # Internal tab identifiers. CTkTabview uses the tab *name* as key, so fixed
@@ -78,6 +79,7 @@ class GUIDManagerApp(ctk.CTk):
 
     def __init__(self):
         super().__init__()
+        install_styled_dialogs()
         self.geometry("1050x820")
 
         # Window icon

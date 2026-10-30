@@ -651,13 +651,13 @@ class DatabaseTab:
                                    self.app.tr("pkg_no_packages"))
             return
 
-        dialog = tk.Toplevel(self.app)
+        dialog = ctk.CTkToplevel(self.app)
         dialog.title(self.app.tr("pkg_choose_title"))
         dialog.transient(self.app)
         dialog.grab_set()
         dialog.resizable(False, False)
 
-        tk.Label(dialog, text=self.app.tr("pkg_choose_prompt")).pack(
+        ctk.CTkLabel(dialog, text=self.app.tr("pkg_choose_prompt")).pack(
             padx=20, pady=(18, 8), anchor="w")
         selected = tk.StringVar(value=packages[0])
         combo = ttk.Combobox(dialog, textvariable=selected, values=packages,
@@ -665,12 +665,17 @@ class DatabaseTab:
         combo.pack(padx=20, pady=(0, 14), fill="x")
         combo.focus_set()
 
-        buttons = tk.Frame(dialog)
+        buttons = ctk.CTkFrame(dialog, fg_color="transparent")
         buttons.pack(padx=20, pady=(0, 18), fill="x")
-        tk.Button(buttons, text=self.app.tr("btn_cancel"), command=dialog.destroy).pack(side="right")
-        tk.Button(buttons, text=self.app.tr("pkg_add_button"),
-                  command=lambda: self._confirm_add_to_mod_package(
-                      dialog, selected.get(), guids)).pack(side="right", padx=(0, 8))
+        ctk.CTkButton(
+            buttons, text=self.app.tr("btn_cancel"), width=90,
+            fg_color="gray40", hover_color="gray30", command=dialog.destroy,
+        ).pack(side="right")
+        ctk.CTkButton(
+            buttons, text=self.app.tr("pkg_add_button"), width=90,
+            command=lambda: self._confirm_add_to_mod_package(
+                dialog, selected.get(), guids),
+        ).pack(side="right", padx=(0, 8))
         dialog.bind("<Escape>", lambda event: dialog.destroy())
         dialog.bind("<Return>", lambda event: self._confirm_add_to_mod_package(
             dialog, selected.get(), guids))

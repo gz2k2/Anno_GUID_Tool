@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.7.1
+
+### Added
+- **Mod Package**: GUID entries in the Mod Package can now be edited.
+
+
 ## v0.7.0
 
 ### Added
