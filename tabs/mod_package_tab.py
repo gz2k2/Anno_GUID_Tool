@@ -53,6 +53,7 @@ class ModPackageTab:
         scroll = ttk.Scrollbar(container, orient="vertical", command=self.tree.yview)
         self.tree.configure(yscrollcommand=scroll.set)
         self.tree.bind("<Button-3>", self.show_context_menu)
+        self.tree.bind("<Double-1>", self.edit_selected_range)
         self.tree.grid(row=0, column=0, sticky="nsew", padx=(5, 0), pady=5)
         scroll.grid(row=0, column=1, sticky="ns", padx=(0, 5), pady=5)
         container.grid_rowconfigure(0, weight=1)
@@ -169,8 +170,93 @@ class ModPackageTab:
         if item not in self.tree.selection():
             self.tree.selection_set(item)
         menu = tk.Menu(self.app, tearoff=0)
+        if len(self.tree.selection()) == 1:
+            menu.add_command(label=self.app.tr("pkg_edit_range"),
+                             command=self.edit_selected_range)
         menu.add_command(label="Remove", command=self.remove_range)
         menu.post(event.x_root, event.y_root)
+
+    def edit_selected_range(self, event=None):
+        """Open a modal editor for the single selected GUID range."""
+        if event is not None:
+            item = self.tree.identify_row(event.y)
+            if not item:
+                return "break"
+            self.tree.selection_set(item)
+        selection = self.tree.selection()
+        if len(selection) != 1:
+            return "break" if event is not None else None
+
+        name, index_text = selection[0].split("\0", 1)
+        index = int(index_text)
+        ranges = self.app.mod_packages.packages.get(name, [])
+        if not 0 <= index < len(ranges):
+            return "break" if event is not None else None
+        start, end = ranges[index]
+
+        dialog = ctk.CTkToplevel(self.app)
+        dialog.title(self.app.tr("pkg_edit_range_title"))
+        dialog.transient(self.app)
+        dialog.resizable(False, False)
+        dialog.grab_set()
+
+        form = ctk.CTkFrame(dialog, fg_color="transparent")
+        form.pack(padx=20, pady=(18, 10), fill="x")
+        ctk.CTkLabel(form, text=self.app.tr("pkg_guid_start")).grid(
+            row=0, column=0, padx=(0, 8), pady=6, sticky="w")
+        entry_start = ctk.CTkEntry(form, width=150)
+        entry_start.grid(row=0, column=1, pady=6)
+        entry_start.insert(0, str(start))
+        ctk.CTkLabel(form, text=self.app.tr("pkg_guid_end")).grid(
+            row=1, column=0, padx=(0, 8), pady=6, sticky="w")
+        entry_end = ctk.CTkEntry(form, width=150)
+        entry_end.grid(row=1, column=1, pady=6)
+        entry_end.insert(0, str(end))
+
+        buttons = ctk.CTkFrame(dialog, fg_color="transparent")
+        buttons.pack(padx=20, pady=(0, 18), fill="x")
+        ctk.CTkButton(buttons, text=self.app.tr("btn_cancel"), width=90,
+                      fg_color="gray40", hover_color="gray30",
+                      command=dialog.destroy).pack(side="right")
+        ctk.CTkButton(
+            buttons, text=self.app.tr("pkg_save_range"), width=90,
+            command=lambda: self._save_edited_range(
+                dialog, name, index, entry_start.get(), entry_end.get()),
+        ).pack(side="right", padx=(0, 8))
+
+        dialog.bind("<Escape>", lambda _event: dialog.destroy())
+        dialog.bind("<Return>", lambda _event: self._save_edited_range(
+            dialog, name, index, entry_start.get(), entry_end.get()))
+        entry_start.focus_set()
+        entry_start.selection_range(0, tk.END)
+        return "break" if event is not None else None
+
+    def _save_edited_range(self, dialog, name, index, start_text, end_text):
+        """Validate and persist values entered in the range editor."""
+        try:
+            start = int(start_text.strip())
+            end = int(end_text.strip())
+        except ValueError:
+            start = end = -1
+        if start < 0 or end < start:
+            messagebox.showerror(self.app.tr("pkg_error"),
+                                 self.app.tr("pkg_range_invalid"), parent=dialog)
+            return
+
+        changed, conflict = self.app.mod_packages.update_range(
+            name, index, start, end)
+        if conflict:
+            messagebox.showerror(
+                self.app.tr("pkg_error"),
+                self.app.tr("pkg_range_overlap").format(conflict),
+                parent=dialog,
+            )
+            return
+        if changed:
+            self.app.mod_packages.save()
+            self.refresh_view()
+            self.app.database_tab.refresh_view()
+        dialog.destroy()
 
     def remove_range(self):
         """Remove all selected ranges from the currently displayed Mod Package."""

@@ -121,6 +121,26 @@ class ModPackages:
         self.packages[name] = merged
         return len(new_numbers), None
 
+    def update_range(self, name: str, index: int, start: int, end: int) -> tuple[bool, str | None]:
+        """Replace one range and keep package ranges sorted.
+
+        Returns ``(changed, conflict_package)``. The existing range is ignored
+        during overlap validation so it can be resized in place. No data is
+        changed when the package/index is invalid or another range overlaps.
+        """
+        ranges = self.packages.get(name)
+        if ranges is None or not 0 <= index < len(ranges) or start < 0 or end < start:
+            return False, None
+        conflict = self.overlapping_package(start, end, ignore=(name, index))
+        if conflict is not None:
+            return False, conflict
+        new_range = (start, end)
+        if ranges[index] == new_range:
+            return False, None
+        ranges[index] = new_range
+        ranges.sort()
+        return True, None
+
     def remove_range(self, name: str, index: int) -> bool:
         ranges = self.packages.get(name)
         if ranges is None or not 0 <= index < len(ranges):
